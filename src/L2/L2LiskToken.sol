@@ -6,9 +6,8 @@ import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title IOptimismMintableERC20
-/// @notice This interface is available on the OptimismMintableERC20 contract.
-///         We declare it as a separate interface so that it can be used in
-///         custom implementations of OptimismMintableERC20.
+/// @notice Interface for the OptimismMintableERC20 contract, providing an abstraction layer for custom implementations.
+///         Includes functionalities for minting and burning tokens, and querying token and bridge addresses.
 interface IOptimismMintableERC20 is IERC165 {
     function remoteToken() external view returns (address);
     function bridge() external returns (address);
@@ -52,7 +51,12 @@ contract L2LiskToken is IOptimismMintableERC20, ERC20, ERC20Permit {
     /// @param amount  Amount of tokens burned.
     event Burn(address indexed account, uint256 amount);
 
-    /// @notice A modifier that only allows the bridge to call
+    /// @notice Emitted whenever the Standard bridge address is changed.
+    /// @param oldBridgeAddr Address of the old Standard bridge.
+    /// @param newBridgeAddr Address of the new Standard bridge.
+    event BridgeAddressChanged(address indexed oldBridgeAddr, address indexed newBridgeAddr);
+
+    /// @notice A modifier that only allows the bridge to call.
     modifier onlyBridge() {
         require(msg.sender == BRIDGE, "L2LiskToken: only bridge can mint or burn");
         _;
@@ -61,6 +65,7 @@ contract L2LiskToken is IOptimismMintableERC20, ERC20, ERC20Permit {
     /// @notice Constructs the L2LiskToken contract.
     /// @param remoteTokenAddr Address of the corresponding L1LiskToken.
     constructor(address remoteTokenAddr) ERC20(NAME, SYMBOL) ERC20Permit(NAME) {
+        require(remoteTokenAddr != address(0), "L2LiskToken: remoteTokenAddr can not be zero");
         REMOTE_TOKEN = remoteTokenAddr;
         initializer = tx.origin;
     }
@@ -69,29 +74,31 @@ contract L2LiskToken is IOptimismMintableERC20, ERC20, ERC20Permit {
     /// @param bridgeAddr      Address of the L2 standard bridge.
     function initialize(address bridgeAddr) public {
         require(msg.sender == initializer, "L2LiskToken: only initializer can initialize this contract");
+        require(bridgeAddr != address(0), "L2LiskToken: bridgeAddr can not be zero");
         require(BRIDGE == address(0), "L2LiskToken: already initialized");
         BRIDGE = bridgeAddr;
+        emit BridgeAddressChanged(address(0), bridgeAddr);
     }
 
-    /// @notice Allows the StandardBridge on this network to mint tokens.
-    /// @param to     Address to mint tokens to.
+    /// @notice Mint function callable only by the bridge, to increase the token balance.
+    /// @param to     Address receiving the minted tokens.
     /// @param amount Amount of tokens to mint.
     function mint(address to, uint256 amount) external virtual override(IOptimismMintableERC20) onlyBridge {
         _mint(to, amount);
         emit Mint(to, amount);
     }
 
-    /// @notice Allows the StandardBridge on this network to burn tokens.
-    /// @param from   Address to burn tokens from.
+    /// @notice Burn function callable only by the bridge, to decrease the token balance.
+    /// @param from   Address from whose tokens are burned.
     /// @param amount Amount of tokens to burn.
     function burn(address from, uint256 amount) external virtual override(IOptimismMintableERC20) onlyBridge {
         _burn(from, amount);
         emit Burn(from, amount);
     }
 
-    /// @notice ERC165 interface check function.
-    /// @param interfaceId Interface ID to check.
-    /// @return Whether or not the interface is supported by this contract.
+    /// @notice Checks if a given interface is supported by the contract.
+    /// @param interfaceId ID of the interface being queried.
+    /// @return True if the interface is supported, false otherwise.
     function supportsInterface(bytes4 interfaceId) external pure virtual returns (bool) {
         bytes4 iface1 = type(IERC165).interfaceId;
         // Interface corresponding to the L2LiskToken (this contract).
