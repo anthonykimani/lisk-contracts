@@ -13,6 +13,8 @@ contract Utils is Script {
     struct L1AddressesConfig {
         /// @notice L1 Lisk token address.
         address L1LiskToken;
+        address L1LidoSwap;
+        address L1DivaSwap;
     }
 
     /// @notice This struct is used to read and write L2 addresses to JSON file.
@@ -21,8 +23,26 @@ contract Utils is Script {
         address L2ClaimContract;
         /// @notice The Current implementation of L2 Claim Contract.
         address L2ClaimImplementation;
+        /// @notice L2 Governor contract (in Proxy), which users interact with.
+        address L2Governor;
+        /// @notice The Current implementation of L2 Governor Contract.
+        address L2GovernorImplementation;
         /// @notice L2 Lisk token address.
         address L2LiskToken;
+        /// @notice L2 Locking Position contract (in Proxy), which users interact with.
+        address L2LockingPosition;
+        /// @notice The Current implementation of L2 Locking Position Contract.
+        address L2LockingPositionImplementation;
+        /// @notice L2 Staking contract (in proxy), which users interact with.
+        address L2Staking;
+        /// @notice The current implementation of L2 Staking contract.
+        address L2StakingImplementation;
+        /// @notice L2 Timelock Controller address.
+        address L2TimelockController;
+        /// @notice L2 Voting Power contract (in Proxy), which users interact with.
+        address L2VotingPower;
+        /// @notice The Current implementation of L2 Voting Power Contract.
+        address L2VotingPowerImplementation;
     }
 
     /// @notice This struct is used to read MerkleRoot from JSON file.
@@ -67,8 +87,16 @@ contract Utils is Script {
         string memory root = vm.projectRoot();
         string memory addressPath = string.concat(root, "/deployment/", network, "/l1addresses.json");
         string memory addressJson = vm.readFile(addressPath);
-        bytes memory addressRaw = vm.parseJson(addressJson);
-        return abi.decode(addressRaw, (L1AddressesConfig));
+
+        L1AddressesConfig memory l1AddressesConfig;
+
+        try vm.parseJsonAddress(addressJson, ".L1LiskToken") returns (address l1LiskToken) {
+            l1AddressesConfig.L1LiskToken = l1LiskToken;
+        } catch {
+            l1AddressesConfig.L1LiskToken = address(0);
+        }
+
+        return l1AddressesConfig;
     }
 
     /// @notice This function writes L1 addresses to JSON file.
@@ -76,8 +104,19 @@ contract Utils is Script {
     function writeL1AddressesFile(L1AddressesConfig memory cfg) external {
         string memory network = getNetworkType();
         string memory json = "";
-        string memory finalJson = vm.serializeAddress(json, "L1LiskToken", cfg.L1LiskToken);
-        finalJson.write(string.concat("deployment/", network, "/l1addresses.json"));
+        vm.serializeAddress(json, "L1LiskToken", cfg.L1LiskToken);
+        vm.serializeAddress(json, "L1LidoSwap", cfg.L1LidoSwap);
+        vm.serializeAddress(json, "L1DivaSwap", cfg.L1DivaSwap);
+        json.write(string.concat("deployment/", network, "/l1addresses.json"));
+    }
+
+    /// @notice This function writes L1 addresses to JSON file.
+    /// @param field Field name in JSON file.
+    function writeL1AddressToFile(string memory field, address fieldvalue) external {
+        string memory network = getNetworkType();
+        string memory json = "";
+        vm.serializeAddress(json, field, fieldvalue);
+        json.write(string.concat("deployment/", network, "/l1addresses.json"));
     }
 
     /// @notice This function reads L2 addresses from JSON file.
@@ -87,8 +126,86 @@ contract Utils is Script {
         string memory root = vm.projectRoot();
         string memory addressPath = string.concat(root, "/deployment/", network, "/l2addresses.json");
         string memory addressJson = vm.readFile(addressPath);
-        bytes memory addressRaw = vm.parseJson(addressJson);
-        return abi.decode(addressRaw, (L2AddressesConfig));
+
+        L2AddressesConfig memory l2AddressesConfig;
+
+        try vm.parseJsonAddress(addressJson, ".L2ClaimContract") returns (address l2ClaimContract) {
+            l2AddressesConfig.L2ClaimContract = l2ClaimContract;
+        } catch {
+            l2AddressesConfig.L2ClaimContract = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2ClaimImplementation") returns (address l2ClaimImplementation) {
+            l2AddressesConfig.L2ClaimImplementation = l2ClaimImplementation;
+        } catch {
+            l2AddressesConfig.L2ClaimImplementation = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2Governor") returns (address l2Governor) {
+            l2AddressesConfig.L2Governor = l2Governor;
+        } catch {
+            l2AddressesConfig.L2Governor = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2GovernorImplementation") returns (address l2GovernorImplementation) {
+            l2AddressesConfig.L2GovernorImplementation = l2GovernorImplementation;
+        } catch {
+            l2AddressesConfig.L2GovernorImplementation = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2LiskToken") returns (address l2LiskToken) {
+            l2AddressesConfig.L2LiskToken = l2LiskToken;
+        } catch {
+            l2AddressesConfig.L2LiskToken = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2LockingPosition") returns (address l2LockingPosition) {
+            l2AddressesConfig.L2LockingPosition = l2LockingPosition;
+        } catch {
+            l2AddressesConfig.L2LockingPosition = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2LockingPositionImplementation") returns (
+            address l2LockingPositionImplementation
+        ) {
+            l2AddressesConfig.L2LockingPositionImplementation = l2LockingPositionImplementation;
+        } catch {
+            l2AddressesConfig.L2LockingPositionImplementation = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2Staking") returns (address l2Staking) {
+            l2AddressesConfig.L2Staking = l2Staking;
+        } catch {
+            l2AddressesConfig.L2Staking = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2StakingImplementation") returns (address l2StakingImplementation) {
+            l2AddressesConfig.L2StakingImplementation = l2StakingImplementation;
+        } catch {
+            l2AddressesConfig.L2StakingImplementation = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2TimelockController") returns (address l2TimelockController) {
+            l2AddressesConfig.L2TimelockController = l2TimelockController;
+        } catch {
+            l2AddressesConfig.L2TimelockController = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2VotingPower") returns (address l2VotingPower) {
+            l2AddressesConfig.L2VotingPower = l2VotingPower;
+        } catch {
+            l2AddressesConfig.L2VotingPower = address(0);
+        }
+
+        try vm.parseJsonAddress(addressJson, ".L2VotingPowerImplementation") returns (
+            address l2VotingPowerImplementation
+        ) {
+            l2AddressesConfig.L2VotingPowerImplementation = l2VotingPowerImplementation;
+        } catch {
+            l2AddressesConfig.L2VotingPowerImplementation = address(0);
+        }
+
+        return l2AddressesConfig;
     }
 
     /// @notice This function writes L2 addresses to JSON file.
@@ -98,7 +215,17 @@ contract Utils is Script {
         string memory json = "";
         vm.serializeAddress(json, "L2ClaimContract", cfg.L2ClaimContract);
         vm.serializeAddress(json, "L2ClaimImplementation", cfg.L2ClaimImplementation);
-        string memory finalJson = vm.serializeAddress(json, "L2LiskToken", cfg.L2LiskToken);
+        vm.serializeAddress(json, "L2Governor", cfg.L2Governor);
+        vm.serializeAddress(json, "L2GovernorImplementation", cfg.L2GovernorImplementation);
+        vm.serializeAddress(json, "L2LiskToken", cfg.L2LiskToken);
+        vm.serializeAddress(json, "L2LockingPosition", cfg.L2LockingPosition);
+        vm.serializeAddress(json, "L2LockingPositionImplementation", cfg.L2LockingPositionImplementation);
+        vm.serializeAddress(json, "L2Staking", cfg.L2Staking);
+        vm.serializeAddress(json, "L2StakingImplementation", cfg.L2StakingImplementation);
+        vm.serializeAddress(json, "L2TimelockController", cfg.L2TimelockController);
+        vm.serializeAddress(json, "L2VotingPower", cfg.L2VotingPower);
+        string memory finalJson =
+            vm.serializeAddress(json, "L2VotingPowerImplementation", cfg.L2VotingPowerImplementation);
         finalJson.write(string.concat("deployment/", network, "/l2addresses.json"));
     }
 

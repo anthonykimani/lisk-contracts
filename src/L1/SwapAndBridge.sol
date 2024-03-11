@@ -2,58 +2,104 @@
 
 pragma solidity 0.8.23;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface stETHInterface is IERC20 {
-    function getCurrentStakeLimit() external returns (uint256);
+/// @title IL1StandardBridge - L1 Standard Bridge interface
+/// @notice This contract is used to transfer L1 tokens to the L2 network as L2 tokens.
+interface IL1StandardBridge {
+    /// Deposits L1 Lisk tokens into a target account on L2 network.
+    /// @param _l1Token L1 token address.
+    /// @param _l2Token L2 token address.
+    /// @param _to Target account address on L2 network.
+    /// @param _amount Amount of L1 tokens to be transferred.
+    /// @param _minGasLimit Minimum gas limit for the deposit message on L2.
+    /// @param _extraData Optional data to forward to L2. Data supplied here will not be used to
+    ///                   execute any code on L2 and is only emitted as extra data for the
+    ///                   convenience of off-chain tooling.
+    function depositERC20To(
+        address _l1Token,
+        address _l2Token,
+        address _to,
+        uint256 _amount,
+        uint32 _minGasLimit,
+        bytes calldata _extraData
+    )
+        external;
 }
 
-interface WstETHInterface is IERC20 { }
+/// @title SwapAndBridge
+/// @notice SwapAndBridge is the utility contract that allows to swap ETH to wstETH and bridge it to L2.
+///         It is designed to be used as a part of the Lisk L2 ecosystem.
+contract SwapAndBridge {
+    /// @notice Address of the L1 bridge contract. This is configurable since not all tokens are bridged sing the
+    /// standard bridge.
+    address public immutable L1_BRIDGE_ADDRESS;
 
-interface OPBridgeInterface {
-    function depositERC20To(address, address, address, uint256, uint32, bytes calldata) external;
-}
+    /// @notice Amount of gas to be used for the deposit message on L2.
+    uint32 public DEPOSIT_GAS = 200000;
 
-contract SwapAndBridge is ReentrancyGuard {
-    address private immutable L1stETH_ADDRESS = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
-    address private immutable L1BRIDGE_ADDRESS = 0x76943C0D61395d8F2edF9060e1533529cAe05dE6;
-    address private immutable L1WstETH_ADDRESS = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
-    address private immutable L2WstETH_ADDRESS = 0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb;
-    stETHInterface public stETH = stETHInterface(L1stETH_ADDRESS);
-    WstETHInterface public WstETH = WstETHInterface(L1WstETH_ADDRESS);
-    OPBridgeInterface public LidoBridge = OPBridgeInterface(L1BRIDGE_ADDRESS);
+    /// @notice Address of the wstETH on L1.
+    address public immutable L1_TOKEN;
 
-    enum StakingPool {
-        Lido,
-        RocketPool,
-        Diva
+    /// @notice Address of the wstETH on L2.
+    address public immutable L2_TOKEN;
+
+    IERC20 private L1_TOKEN_CONTRACT;
+    IL1StandardBridge private L1_BRIDGE;
+
+    constructor(address _BRIDGE_ADDRESS, address _l1Token, address _l2Token) {
+        L1_BRIDGE_ADDRESS = _BRIDGE_ADDRESS;
+        L1_TOKEN = _l1Token;
+        L2_TOKEN = _l2Token;
+        L1_TOKEN_CONTRACT = IERC20(L1_TOKEN);
+        L1_BRIDGE = IL1StandardBridge(L1_BRIDGE_ADDRESS);
     }
 
-    function swap_and_bridge() public payable nonReentrant {
-        uint256 current_stake_limit = stETH.getCurrentStakeLimit();
-        require(msg.value <= current_stake_limit, "Current stake limit too small.");
-
-        // Send ETH and mint wstETH for SwapAndBridge contract.
-        (bool sent,) = address(WstETH).call{ value: msg.value }("");
+    /// @notice Swap ETH to wstETH and bridge it to the sender address on the L2.
+    function swapAndBridge() public payable {
+        // Send ETH and mint wstETH for SwapAndBridge contract. This call can fail, for instance, if the amount
+        // of ETH sent is greater than the staking limit of the target contract.
+        (bool sent,) = L1_TOKEN.call{ value: msg.value }("");
         require(sent, "Failed to send Ether.");
 
-        // I didn't find a better way to get how many wstETH tokens where minted
-        uint256 balance = WstETH.balanceOf(address(this));
-        WstETH.approve(L1BRIDGE_ADDRESS, balance);
+        // Get current balance of wstETH for this contract.
+        // We ensure at the end of the function that the contract balance is 0,
+        // hence this is the amount of wstETH minted.
+        uint256 balance = L1_TOKEN_CONTRACT.balanceOf(address(this));
+        L1_TOKEN_CONTRACT.approve(L1_BRIDGE_ADDRESS, balance);
 
-        //transfer tokens to user. This is for testing purposes.
-        // WstETH.transfer(msg.sender, balance);
+        // Bridge tokens to L2.
+        // We use depositERC20To rather than depositERC20 because the latter can only be called by EOA.
+        L1_BRIDGE.depositERC20To(L1_TOKEN, L2_TOKEN, msg.sender, balance, DEPOSIT_GAS, "0x");
 
-        // Bridge tokens to L2
-        LidoBridge.depositERC20To(L1WstETH_ADDRESS, L2WstETH_ADDRESS, msg.sender, balance, 200000, "0x");
+        // Check that this contract has no tokens left in its balance.
+        require(L1_TOKEN_CONTRACT.balanceOf(address(this)) == 0, "Contract still has tokens.");
     }
 
-    function balanceOf(address account) public view returns (uint256) {
-        return WstETH.balanceOf(account);
+    /// @notice Swap ETH to wstETH and bridge it to the recipient address on the L2.
+    /// @param recipient The address to bridge the wstETH to.
+    function swapAndBridgeTo(address recipient) public payable {
+        // Send ETH and mint wstETH for SwapAndBridge contract. This call can fail, for instance, if the amount
+        // of ETH sent is greater than the staking limit of the target contract.
+        (bool sent,) = L1_TOKEN.call{ value: msg.value }("");
+        require(sent, "Failed to send Ether.");
+
+        // Get current balance of wstETH for this contract.
+        // We ensure at the end of the function that the contract balance is 0,
+        // hence this is the amount of wstETH minted.
+        uint256 balance = L1_TOKEN_CONTRACT.balanceOf(address(this));
+        L1_TOKEN_CONTRACT.approve(L1_BRIDGE_ADDRESS, balance);
+
+        // Bridge tokens to L2.
+        // We use depositERC20To rather than depositERC20 because the latter can only be called by EOA.
+        L1_BRIDGE.depositERC20To(L1_TOKEN, L2_TOKEN, recipient, balance, DEPOSIT_GAS, "0x");
+
+        // Check that this contract has no tokens left in its balance.
+        require(L1_TOKEN_CONTRACT.balanceOf(address(this)) == 0, "Contract still has tokens.");
     }
 
-    function allowance(address owner, address spender) public view returns (uint256) {
-        return WstETH.allowance(owner, spender);
+    receive() external payable {
+        // Shortcut to swapAndBridge
+        swapAndBridge();
     }
 }
