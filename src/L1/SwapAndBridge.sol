@@ -57,23 +57,7 @@ contract SwapAndBridge {
 
     /// @notice Swap ETH to wstETH and bridge it to the sender address on the L2.
     function swapAndBridge() public payable {
-        // Send ETH and mint wstETH for SwapAndBridge contract. This call can fail, for instance, if the amount
-        // of ETH sent is greater than the staking limit of the target contract.
-        (bool sent,) = L1_TOKEN.call{ value: msg.value }("");
-        require(sent, "Failed to send Ether.");
-
-        // Get current balance of wstETH for this contract.
-        // We ensure at the end of the function that the contract balance is 0,
-        // hence this is the amount of wstETH minted.
-        uint256 balance = L1_TOKEN_CONTRACT.balanceOf(address(this));
-        L1_TOKEN_CONTRACT.approve(L1_BRIDGE_ADDRESS, balance);
-
-        // Bridge tokens to L2.
-        // We use depositERC20To rather than depositERC20 because the latter can only be called by EOA.
-        L1_BRIDGE.depositERC20To(L1_TOKEN, L2_TOKEN, msg.sender, balance, DEPOSIT_GAS, "0x");
-
-        // Check that this contract has no tokens left in its balance.
-        require(L1_TOKEN_CONTRACT.balanceOf(address(this)) == 0, "Contract still has tokens.");
+        swapAndBridgeTo(msg.sender);
     }
 
     /// @notice Swap ETH to wstETH and bridge it to the recipient address on the L2.
