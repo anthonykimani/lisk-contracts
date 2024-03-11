@@ -71,8 +71,7 @@ contract SwapAndBridge {
         // We ensure at the end of the function that the contract balance is 0,
         // hence this is the amount of wstETH minted.
         uint256 balance = L1_TOKEN_CONTRACT.balanceOf(address(this));
-        require(balance > 0, "No wrapped tokens minted.")
-
+        require(balance > 0, "No wrapped tokens minted.");
 
         // Approve the L1 bridge to transfer the wrapped tokens to the L2.
         L1_TOKEN_CONTRACT.approve(L1_BRIDGE_ADDRESS, balance);
