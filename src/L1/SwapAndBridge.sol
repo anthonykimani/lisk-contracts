@@ -28,7 +28,7 @@ interface IL1StandardBridge {
 }
 
 /// @title SwapAndBridge
-/// @notice SwapAndBridge is the utility contract that allows to swap ETH to wstETH and bridge it to L2.
+/// @notice SwapAndBridge is the utility contract that allows to swap ETH to a wrapped LST and bridge it to L2.
 ///         It is designed to be used as a part of the Lisk L2 ecosystem.
 contract SwapAndBridge {
     /// @notice Address of the L1 bridge contract. This is configurable since not all tokens are bridged sing the
@@ -38,10 +38,10 @@ contract SwapAndBridge {
     /// @notice Amount of gas to be used for the deposit message on L2.
     uint32 public DEPOSIT_GAS = 200000;
 
-    /// @notice Address of the wstETH on L1.
+    /// @notice Address of the wrapped LST on L1.
     address public immutable L1_TOKEN;
 
-    /// @notice Address of the wstETH on L2.
+    /// @notice Address of the wrapped LST on L2.
     address public immutable L2_TOKEN;
 
     IERC20 private L1_TOKEN_CONTRACT;
@@ -55,21 +55,19 @@ contract SwapAndBridge {
         L1_BRIDGE = IL1StandardBridge(L1_BRIDGE_ADDRESS);
     }
 
-    /// @notice Swap ETH to wstETH and bridge it to the sender address on the L2.
-    function swapAndBridge() public payable {
-        swapAndBridgeTo(msg.sender);
-    }
-
-    /// @notice Swap ETH to wstETH and bridge it to the recipient address on the L2.
-    /// @param recipient The address to bridge the wstETH to.
+    /// @notice Swap ETH to wrapped LST and bridge it to the recipient address on the L2.
+    /// @param recipient The address to bridge the wrapped LST to.
     function swapAndBridgeTo(address recipient) public payable {
+        // Check recipient is not an invalid address.
+        require(recipient != address(0), "Invalid recipient address.");
+
         // Send ETH and mint wrapped liquid token for SwapAndBridge contract.
         (bool sent,) = L1_TOKEN.call{ value: msg.value }("");
         require(sent, "Failed to send Ether.");
 
-        // Get current balance of wstETH for this contract.
+        // Get current balance of wrapped LST for this contract.
         // We ensure at the end of the function that the contract balance is 0,
-        // hence this is the amount of wstETH minted.
+        // hence this is the amount of wrapped LST minted.
         uint256 balance = L1_TOKEN_CONTRACT.balanceOf(address(this));
         require(balance > 0, "No wrapped tokens minted.");
 
@@ -84,8 +82,13 @@ contract SwapAndBridge {
         require(L1_TOKEN_CONTRACT.balanceOf(address(this)) == 0, "Contract still has tokens.");
     }
 
+    /// @notice Swap ETH to wrapped LST and bridge it to the sender address on the L2.
+    function swapAndBridge() public payable {
+        swapAndBridgeTo(msg.sender);
+    }
+
+    /// @notice Shortcut function to swap and bridge wrapped LST to the sender address on the L2.
     receive() external payable {
-        // Shortcut to swapAndBridge
-        swapAndBridge();
+        swapAndBridgeTo(msg.sender);
     }
 }
