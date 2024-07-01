@@ -21,3 +21,5 @@ When a security issue is identified and resolved, we will update the project and
 If you have any questions about this policy or the security of this project, please email us at [security@lisk.com](mailto:security@lisk.com).
 
 Thank you for helping to keep our project and the broader community safe!
+
+## This is a test
